@@ -657,12 +657,6 @@ require('lazy').setup({
         },
       }
 
-      -- LSP servers and clients are able to communicate to each other what features they support.
-      --  By default, Neovim doesn't support everything that is in the LSP specification.
-      --  When you add blink.cmp, luasnip, etc. Neovim now has *more* capabilities.
-      --  So, we create new capabilities with blink.cmp, and then broadcast that to the servers.
-      local capabilities = require('blink.cmp').get_lsp_capabilities()
-
       -- Enable the following language servers
       --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
       --
@@ -732,7 +726,6 @@ require('lazy').setup({
             -- This handles overriding only values explicitly passed
             -- by the server configuration above. Useful when disabling
             -- certain features of an LSP (for example, turning off formatting for ts_ls)
-            server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
             require('lspconfig')[server_name].setup(server)
           end,
         },
@@ -897,7 +890,7 @@ require('lazy').setup({
   { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
 
   { -- Collection of various small independent plugins/modules
-    'echasnovski/mini.nvim',
+    'nvim-mini/mini.nvim',
     config = function()
       -- Better Around/Inside textobjects
       --
@@ -933,20 +926,53 @@ require('lazy').setup({
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
-  { -- Highlight, edit, and navigate code
+  {
     'nvim-treesitter/nvim-treesitter',
+    lazy = false,
+    branch = 'main', -- CRITICAL: explicit branch required
+    build = ':TSUpdate',
     config = function()
-      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' }
-      require('nvim-treesitter').install(filetypes)
+      local ts = require 'nvim-treesitter'
+
+      -- Setup first (creates the install_dir, etc.)
+      ts.setup()
+
+      -- Defer install to ensure setup() has fully processed
+      vim.defer_fn(function()
+        local parsers = {
+          'bash',
+          'c',
+          'diff',
+          'html',
+          'lua',
+          'luadoc',
+          'markdown',
+          'vim',
+          'vimdoc',
+        }
+        -- Install returns a "task" object; :wait() makes it synchronous
+        ts.install(parsers):wait(300000)
+      end, 0)
+
+      -- Enable highlighting via autocommand (the new way)
       vim.api.nvim_create_autocmd('FileType', {
-        pattern = filetypes,
+        pattern = {
+          'bash',
+          'c',
+          'diff',
+          'html',
+          'lua',
+          'luadoc',
+          'markdown',
+          'vim',
+          'vimdoc',
+        },
         callback = function()
           vim.treesitter.start()
         end,
       })
     end,
   },
-
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
